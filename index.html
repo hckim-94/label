@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>인적성검사 봉투 라벨(폼텍 3120)</title>
+    <!-- 엑셀(.xlsx) 파싱 라이브러리 추가 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: "Pretendard", "Malgun Gothic", "맑은 고딕", system-ui, sans-serif;
+            background: #e2e8f0;
+            padding: 16px;
+        }
+
+        .layout {
+            display: flex;
+            gap: 16px;
+        }
+
+        /* ==== 왼쪽 입력 패널 ==== */
+        .control-panel {
+            width: 380px;
+            min-width: 380px;
+            background: #fff;
+            padding: 12px 14px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            font-size: 13px;
+            
+            /* 고사실이 많아져도 패널만 스크롤되도록 고정 */
+            position: sticky;
+            top: 16px;
+            height: calc(100vh - 32px);
+            overflow-y: auto;
+        }
+
+        .control-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+        .control-panel::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 3px;
+        }
+
+        .control-panel h2 {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        /* ==== 탭 ==== */
+        .tabs {
+            display: flex;
+            gap: 6px;
+            margin: 6px 0 10px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 8px 4px;
+            border: 2px solid;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+            user-select: none;
+            transition: all 0.2s;
+        }
+
+        /* 탭별 색상 */
+        .tab[data-type="all"] {
+            background: #f3e5f5;
+            color: #6a1b9a;
+            border-color: #6a1b9a;
+        }
+        .tab[data-type="question"] {
+            background: #ffecec;
+            color: #c00000;
+            border-color: #c00000;
+        }
+        .tab[data-type="answer"] {
+            background: #fff9e6;
+            color: #b8860b;
+            border-color: #b8860b;
+        }
+        .tab[data-type="collect"] {
+            background: #e7f3ff;
+            color: #0060c0;
+            border-color: #0060c0;
+        }
+
+        /* 활성화된 탭 */
+        .tab[aria-selected="true"][data-type="all"] { background: #6a1b9a; color: #fff; }
+        .tab[aria-selected="true"][data-type="question"] { background: #c00000; color: #fff; }
+        .tab[aria-selected="true"][data-type="answer"] { background: #b8860b; color: #fff; }
+        .tab[aria-selected="true"][data-type="collect"] { background: #0060c0; color: #fff; }
+
+        .field-group {
+            margin-bottom: 8px;
+        }
+
+        .field-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .field-group input,
+        .field-group select {
+            width: 100%;
+            padding: 4px 6px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .field-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .field-row .field-group { flex: 1; }
+
+        .help-text {
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        /* 섹션 분리 헤더 */
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-top: 16px;
+            margin-bottom: 8px;
+            border-top: 2px solid #eee;
+            padding-top: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #2c3e50;
+        }
+
+        /* 동적 섹션(교시/과목) 목록 */
+        .section-block {
+            display: flex; gap: 6px; margin-bottom: 6px; align-items: center; background: #fdfdfd; padding: 8px; border: 1px solid #eee; border-radius: 6px;
+        }
+        .section-block .field-group { margin-bottom: 0; flex: 1; }
+        .section-block .btn-remove { background: #e74c3c; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; height: 26px; margin-top: 16px; }
+
+        /* 동적 고사실 목록 */
+        .room-block {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #fafafa;
+        }
+        
+        /* 고사실 개별설정 헤더 및 삭제버튼 개선 */
+        .room-block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed #cbd5e1;
+        }
+        .room-block-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #475569;
+        }
+        .btn-remove-room {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* 엑셀 기능 버튼 */
+        .btn-excel-dl { background: #10b981; color: #fff; font-weight: bold; padding: 8px; border-radius: 4px; border: none; cursor: pointer; flex: 1; font-size: 12px; }
+        .btn-excel-up { background: #059669; color: #fff; font-weight: bold; padding: 8px; border-radius: 4px; border: none; cursor: pointer; flex: 1; font-size: 12px; }
+
+        .buttons {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            border-top: 2px solid #eee;
+            padding-top: 12px;
+        }
+
+        button {
+            padding: 6px 10px;
+            font-size: 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-add { background: #27ae60; color: #fff; font-weight: bold; }
+        .btn-print { grid-column: span 2; background: #e74c3c; color: #fff; font-weight: bold; padding: 10px; font-size: 14px;}
+        .btn-save { background: #3498db; color: #fff; font-weight: bold; }
+        .btn-load { background: #f39c12; color: #fff; font-weight: bold; }
+        .btn-reset { grid-column: span 2; background: #bdc3c7; }
+
+        /* ==== 오른쪽 라벨 (폼텍 3120 200×140mm) ==== */
+        .label-wrapper {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .labels-pane {
+            display: flex;
+            flex-direction: column;
+            gap: 10mm;
+        }
+
+        .labels-pane[hidden] { display: none !important; }
+
+        .label {
+            width: 200mm;
+            height: 140mm;
+            background:#fff;
+            padding: 8mm 8mm 6mm; /* 상하 여백을 조금 줄여 로고 공간 확보 */
+            border: 1px solid #cbd5e1;
+            border-radius: 12mm;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== 모던 타이틀 바 ===== */
+        .label-title-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            border-radius: 8px;
+            margin-bottom: 3mm;
+            border-width: 2px;
+            border-style: solid;
+        }
+        .theme-question { background: #fef2f2; border-color: #ef4444; color: #b91c1c; }
+        .theme-answer { background: #fffbeb; border-color: #f59e0b; color: #b45309; }
+        .theme-collect { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+
+        .title-left { font-size: 1.15em; font-weight: 700; }
+        .title-right { font-size: 1.35em; font-weight: 900; letter-spacing: 2px; }
+
+        /* ===== 모던 테이블 ===== */
+        .modern-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14.5pt;
+        }
+        .modern-table th,
+        .modern-table td {
+            border: 1px solid #cbd5e1;
+            padding: 4px 6px;
+        }
+        .modern-table th {
+            text-align: center;
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 700;
+        }
+        .modern-table td {
+            text-align: center;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        /* 표 높이 최적화 (로고 공간 밀림 방지 및 가독성 확보) */
+        .row-sm td, .row-sm th { height: 38px; } /* 회수용 봉투 상단 표 높이 유지 */
+        .row-md td, .row-md th { height: 50px; } /* 문제지/답안지 상단 표 전용 높이 */
+        .row-lg td, .row-lg th { height: 54px; } /* 문제지/답안지 하단 표 */
+        .center { text-align: center; }
+
+        /* ===== 핵심: 텍스트 줄바꿈 시 표가 밀리지 않도록 방지하는 절대 좌표 래퍼 ===== */
+        .auto-resize-cell { 
+            padding: 0 !important; 
+        }
+        .td-relative-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        .auto-resize-wrapper {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px 6px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        .auto-resize-text {
+            display: inline-block;
+            white-space: nowrap; 
+            line-height: 1.2;
+            text-align: center;
+        }
+
+        /* 서명란 및 푸터 */
+        .signature-wrap { margin-top: 1.5mm; width: 100%; }
+
+        .label-footer { margin-top: 3mm; font-size: 10pt; font-weight: 500; }
+        .label:not(.collect-label) .label-footer { font-size: 10pt; }
+        .label-footer ul {
+            margin-top: 2mm; margin-left: 0; padding-left: 0;
+            list-style: none; color: #ef4444;
+        }
+        .label-footer li { margin-bottom: 3pt; }
+
+        .label.collect-label { height: 140mm; }
+        .label.collect-label .label-footer li { margin-bottom: 3pt; }
+        .label.collect-label .label-footer { margin-top: 2mm; margin-bottom: 0; }
+        .label.collect-label .label-footer ul { margin-bottom: 0; }
+
+        .label-logo {
+            margin-top: auto;
+            text-align:center;
+            font-weight:700;
+            font-size: 13pt;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .label-logo img {
+            width: 600px;
+            max-height: 65px; /* 로고가 아무리 커도 영역을 넘어가지 않도록 강제 제한 */
+            object-fit: contain;
+            display: block;
+        }
+
+        .logo-placeholder {
+            width: 600px; height: 65px; border: 2px dashed #ccc;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto; color: #999; font-size: 14pt; background: #f9f9f9;
+        }
+
+        /* 인쇄용 스타일 */
+        .print-page {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            gap: 0;
+            width: 200mm;
+            min-height: 280mm;
+            margin-bottom: 10mm;
+            border: 1px dashed #ccc;
+            padding: 0;
+        }
+
+        @media print {
+            @page { size: 200mm 280mm; margin: 0; }
+            body { background:#fff; padding:0; }
+            .control-panel { display:none; }
+            .layout { display:block; margin:0; }
+            .label-wrapper { justify-content:center; align-items:center; padding:0; }
+            .label { border:none; margin:0; width: 200mm; height: 140mm; box-shadow: none; border-radius: 0; }
+            .print-page {
+                page-break-after: always; display: grid; grid-template-rows: 1fr 1fr;
+                gap: 0; width: 200mm; height: 280mm; border: none; margin: 0; padding: 0;
+            }
+            .print-page:last-child { page-break-after: auto; }
+            .print-page .label { page-break-after: auto; }
+            .labels-pane[hidden] { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <!-- ===== 왼쪽 입력 영역 ===== -->
+    <div class="control-panel">
+        <h2>인적성검사 봉투 라벨 작성</h2>
+
+        <div class="field-group">
+            <label>출력 및 미리보기 모드</label>
+            <div class="tabs" role="tablist" aria-label="라벨 종류">
+                <button type="button" class="tab" role="tab" data-type="all" aria-selected="true">일괄출력</button>
+                <button type="button" class="tab" role="tab" data-type="question" aria-selected="false">문제지</button>
+                <button type="button" class="tab" role="tab" data-type="answer" aria-selected="false">답안지</button>
+                <button type="button" class="tab" role="tab" data-type="collect" aria-selected="false">회수</button>
+            </div>
+            <div class="help-text">
+                <b>[일괄출력]</b> 선택 시: 고사실 마다 총 3장(문제지 1장, 답안지 1장, 회수 1장)이 최적화되어 세트로 출력됩니다.
+            </div>
+        </div>
+
+        <div class="section-title">공통 정보 설정</div>
+
+        <!-- 커스터마이징 가능한 항목 이름 설정 추가 -->
+        <div class="field-row">
+            <div class="field-group">
+                <label for="labelField">항목명 변경 (응시분야)</label>
+                <input id="labelField" type="text" value="응시분야">
+            </div>
+            <div class="field-group">
+                <label for="labelRoom">항목명 변경 (고사실)</label>
+                <input id="labelRoom" type="text" value="고사실">
+            </div>
+        </div>
+
+        <div class="field-group">
+            <label for="org">기관</label>
+            <input id="org" type="text" value="">
+        </div>
+
+        <div class="field-row">
+            <div class="field-group">
+                <label for="examName">전형명 / 시험명</label>
+                <input id="examName" type="text" value="">
+            </div>
+            <div class="field-group">
+                <label for="date">일시</label>
+                <input id="date" type="text" value="">
+            </div>
+        </div>
+
+        <!-- 동적 교시/과목 섹션 설정 -->
+        <div class="section-title">
+            <span>시험 교시/과목 설정</span>
+            <button type="button" class="btn-add" onclick="addSection()">+ 항목 추가</button>
+        </div>
+        
+        <div id="sectionList">
+            <!-- 항목이 동적으로 추가됩니다 -->
+        </div>
+        
+        <!-- 로고 이미지 및 서명란 -->
+        <div class="field-group">
+            <label for="logoInput">로고 이미지 URL (선택)</label>
+            <input id="logoInput" type="url" placeholder="https://example.com/logo.png">
+        </div>
+        <div class="field-group">
+            <label for="logoFile">로고 이미지 파일 첨부 (선택)</label>
+            <input id="logoFile" type="file" accept="image/*">
+        </div>
+        <div class="field-group">
+            <div class="field-row">
+                <div class="field-group">
+                    <label for="logoWidth">가로 (px)</label>
+                    <input id="logoWidth" type="text" value="600">
+                </div>
+                <div class="field-group">
+                    <label for="logoHeight">세로 (px)</label>
+                    <input id="logoHeight" type="text" value="80">
+                </div>
+            </div>
+        </div>
+        <div class="field-group">
+            <label for="signMode">감독관 확인 서명란(회수 탭)</label>
+            <select id="signMode">
+                <option value="single">정감독관 1명 서명</option>
+                <option value="double">정/부 감독관 2명 서명</option>
+            </select>
+        </div>
+
+        <!-- 동적 고사실 목록 영역 -->
+        <div class="section-title">
+            <span>고사실 엑셀 일괄 등록</span>
+        </div>
+        <div class="field-row" style="margin-bottom: 12px;">
+            <button type="button" class="btn-excel-dl" onclick="downloadExcelTemplate()">양식 다운로드</button>
+            <button type="button" class="btn-excel-up" onclick="$('excelUpload').click()">엑셀 업로드</button>
+            <input type="file" id="excelUpload" accept=".xlsx, .xls" style="display: none;" onchange="handleExcelUpload(event)">
+        </div>
+
+        <div class="section-title">
+            <span>고사실 개별 설정</span>
+            <button type="button" class="btn-add" onclick="addRoom()">+ 고사실 추가</button>
+        </div>
+
+        <div id="roomList">
+            <!-- 초기 기본 고사실 1개는 자바스크립트에서 렌더링 됩니다. -->
+        </div>
+
+        <div class="buttons">
+            <button class="btn-print" onclick="window.print()">인쇄하기</button>
+            <button class="btn-save" onclick="saveConfig()">설정 저장</button>
+            <button class="btn-load" onclick="$('loadConfig').click()">불러오기</button>
+            <button class="btn-reset" onclick="resetForm()">초기화</button>
+            <input type="file" id="loadConfig" accept=".json" style="display:none;" onchange="loadConfig(event)">
+        </div>
+    </div>
+
+    <!-- ===== 오른쪽 라벨 미리보기 ===== -->
+    <div class="label-wrapper">
+        <div>
+            <div id="pane-all" class="labels-pane" role="tabpanel" aria-labelledby="tab-all"></div>
+            <div id="pane-question" class="labels-pane" role="tabpanel" aria-labelledby="tab-question" hidden></div>
+            <div id="pane-answer" class="labels-pane" role="tabpanel" aria-labelledby="tab-answer" hidden></div>
+            <div id="pane-collect" class="labels-pane" role="tabpanel" aria-labelledby="tab-collect" hidden></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const $ = id => document.getElementById(id);
+
+    let logoSrc = '';     // 로고 이미지 dataURL
+
+    // 입력폼에 있는 고사실 목록을 읽어 객체 배열로 반환
+    function getBaseDataFromForm() {
+        const globalOrg = $('org').value;
+        const globalExamName = $('examName').value;
+        const globalDate = $('date').value;
+        const labelField = $('labelField').value || '응시분야';
+        const labelRoom = $('labelRoom').value || '고사실';
+
+        const roomBlocks = document.querySelectorAll('.room-block');
+        const data = [];
+
+        roomBlocks.forEach((block, idx) => {
+            data.push({
+                org: globalOrg,
+                examName: globalExamName,
+                date: globalDate,
+                labelField: labelField, // 항목명 저장
+                labelRoom: labelRoom,   // 항목명 저장
+                field: block.querySelector('.room-field').value,
+                room: block.querySelector('.room-name').value,
+                targetCount: block.querySelector('.room-target').value,
+                qCopies: block.querySelector('.room-qcopies').value,
+                aCopies: block.querySelector('.room-acopies').value,
+                index: idx + 1
+            });
+        });
+
+        // 고사실이 전부 지워졌을 때 에러 방지용 기본 빈칸 객체
+        if (data.length === 0) {
+            data.push({
+                org: globalOrg, examName: globalExamName, date: globalDate, 
+                labelField: labelField, labelRoom: labelRoom, field: '',
+                room: '', targetCount: '', qCopies: '', aCopies: '', index: 1
+            });
+        }
+        return data;
+    }
+
+    // 현재 입력된 교시/과목 섹션 목록을 객체 배열로 반환
+    function getSectionsData() {
+        const sections = [];
+        document.querySelectorAll('.section-block').forEach(block => {
+            sections.push({
+                period: block.querySelector('.sec-period').value,
+                subject: block.querySelector('.sec-subject').value
+            });
+        });
+        if (sections.length === 0) {
+            sections.push({ period: '', subject: '' });
+        }
+        return sections;
+    }
+
+    // 동적 섹션(교시/과목) 추가
+    function addSection(secData = null) {
+        const container = $('sectionList');
+        const div = document.createElement('div');
+        div.className = 'section-block';
+        
+        const currentCount = container.querySelectorAll('.section-block').length;
+        const defaultPeriod = secData && secData.period !== undefined ? secData.period : (currentCount + 1) + '교시';
+        const defaultSubject = secData && secData.subject !== undefined ? secData.subject : '';
+
+        div.innerHTML = `
+            <div class="field-group">
+                <label>교시</label>
+                <input type="text" class="sec-period" value="${defaultPeriod}" placeholder="예: 1교시">
+            </div>
+            <div class="field-group">
+                <label>과목명</label>
+                <input type="text" class="sec-subject" value="${defaultSubject}" placeholder="예: 인성검사">
+            </div>
+            <button type="button" class="btn-remove" onclick="removeSection(this)">삭제</button>
+        `;
+
+        div.querySelectorAll('input').forEach(el => {
+            el.addEventListener('input', updateLabel);
+            el.addEventListener('change', updateLabel);
+        });
+
+        container.appendChild(div);
+        
+        if (!secData) updateLabel();
+    }
+
+    // 동적 섹션 삭제
+    function removeSection(btn) {
+        const block = btn.closest('.section-block');
+        if (block) {
+            block.remove();
+            updateLabel();
+        }
+    }
+
+    // 동적 고사실 블록 추가 
+    function addRoom(roomData = null) {
+        const container = $('roomList');
+        const div = document.createElement('div');
+        div.className = 'room-block';
+        
+        const currentCount = container.querySelectorAll('.room-block').length;
+        const defaultRoomName = roomData && roomData.name !== undefined ? roomData.name : (currentCount + 1) + '고사실';
+        const fieldVal = roomData && roomData.field !== undefined ? roomData.field : '';
+        const targetCount = roomData && roomData.target !== undefined ? roomData.target : '';
+        const qCopies = roomData && roomData.qCopies !== undefined ? roomData.qCopies : '';
+        const aCopies = roomData && roomData.aCopies !== undefined ? roomData.aCopies : '';
+        
+        const labelField = $('labelField').value || '응시분야';
+        const labelRoom = $('labelRoom').value || '고사실';
+
+        div.innerHTML = `
+            <div class="room-block-header">
+                <span class="room-block-title">${defaultRoomName} 설정</span>
+                <button type="button" class="btn-remove-room" onclick="removeRoom(this)">삭제</button>
+            </div>
+            <div class="field-row">
+                <div class="field-group">
+                    <label class="lbl-field">${labelField}</label>
+                    <input type="text" class="room-field" value="${fieldVal}" placeholder="예: 일반행정">
+                </div>
+                <div class="field-group">
+                    <label class="lbl-room">${labelRoom}</label>
+                    <input type="text" class="room-name" value="${defaultRoomName}" placeholder="예: 1고사실" oninput="this.closest('.room-block').querySelector('.room-block-title').textContent = this.value + ' 설정'">
+                </div>
+                <div class="field-group">
+                    <label>대상인원</label>
+                    <input type="text" class="room-target" value="${targetCount}" placeholder="숫자">
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field-group">
+                    <label>문제지 부수</label>
+                    <input type="text" class="room-qcopies" value="${qCopies}" placeholder="부수">
+                </div>
+                <div class="field-group">
+                    <label>답안지 매수</label>
+                    <input type="text" class="room-acopies" value="${aCopies}" placeholder="매수">
+                </div>
+            </div>
+        `;
+
+        div.querySelectorAll('input').forEach(el => {
+            el.addEventListener('input', updateLabel);
+            el.addEventListener('change', updateLabel);
+        });
+
+        container.appendChild(div);
+        
+        if (!roomData) {
+            const panel = document.querySelector('.control-panel');
+            panel.scrollTop = panel.scrollHeight;
+            updateLabel();
+        }
+    }
+
+    // 고사실 블록 삭제
+    function removeRoom(btn) {
+        const block = btn.closest('.room-block');
+        if (block) {
+            block.remove();
+            updateLabel();
+        }
+    }
+
+    // 항목명 변경 시 하위 블록들 라벨 텍스트도 동기화
+    $('labelField').addEventListener('input', function() {
+        const val = this.value || '응시분야';
+        document.querySelectorAll('.lbl-field').forEach(el => el.textContent = val);
+        updateLabel();
+    });
+    $('labelRoom').addEventListener('input', function() {
+        const val = this.value || '고사실';
+        document.querySelectorAll('.lbl-room').forEach(el => el.textContent = val);
+        updateLabel();
+    });
+
+    // 엑셀 양식 다운로드
+    function downloadExcelTemplate() {
+        const fieldName = $('labelField').value || '응시분야';
+        const roomName = $('labelRoom').value || '고사실';
+        
+        const ws = XLSX.utils.aoa_to_sheet([
+            ["기관", "전형명/시험명", "일시", fieldName, roomName, "대상인원", "문제지 부수", "답안지 매수"],
+            [$('org').value || "테스트기관", $('examName').value || "2024년 하반기 공채", $('date').value || "2024-12-01 10:00", "일반행정", "1고사실", "25", "25", "25"]
+        ]);
+        
+        // 컬럼 너비 보기 좋게 설정
+        ws['!cols'] = [{wch: 15}, {wch: 25}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 12}, {wch: 12}];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "고사실목록");
+        XLSX.writeFile(wb, "라벨지_일괄등록_양식.xlsx");
+    }
+
+    // 엑셀 업로드 처리
+    function handleExcelUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet);
+                
+                if(rows.length > 0) {
+                    $('roomList').innerHTML = ''; // 기존 등록된 고사실 비우기
+                    
+                    // 첫 번째 행에 공통 값이 있다면 공통 입력칸에 반영
+                    if (rows[0]['기관']) $('org').value = rows[0]['기관'];
+                    if (rows[0]['전형명/시험명']) $('examName').value = rows[0]['전형명/시험명'];
+                    if (rows[0]['일시']) $('date').value = rows[0]['일시'];
+                    
+                    const fieldName = $('labelField').value || '응시분야';
+                    const roomName = $('labelRoom').value || '고사실';
+                    
+                    rows.forEach((row, idx) => {
+                        addRoom({
+                            field: row[fieldName] || row['응시분야'] || '',
+                            name: row[roomName] || row['고사실'] || (idx + 1) + '고사실',
+                            target: row['대상인원'] || '',
+                            qCopies: row['문제지 부수'] || '',
+                            aCopies: row['답안지 매수'] || ''
+                        });
+                    });
+                    updateLabel();
+                    alert('엑셀 데이터가 성공적으로 업로드 되었습니다.');
+                } else {
+                    alert('업로드된 엑셀 파일에 데이터가 없습니다.');
+                }
+            } catch (err) {
+                alert('엑셀 파일을 읽는 중 오류가 발생했습니다. 지정된 양식이 맞는지 확인해 주세요.');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        event.target.value = ''; // 재사용을 위해 초기화
+    }
+
+    function getHighlightClass(type) {
+        if (type === 'question') return 'theme-question';
+        if (type === 'answer') return 'theme-answer';
+        if (type === 'collect') return 'theme-collect';
+        return 'theme-question';
+    }
+
+    function getFooterHtml(type) {
+        if (type === 'collect') {
+            return [
+                '※ 응시인원과 회수된 답안지 매수가 일치하는지 확인하여 주십시오.',
+                '※ 본 회수용 봉투에는 유효 답안지(최종 제출 답안지)만 넣어 주십시오.',
+                '※ 본 봉투는 관계자 외에는 개봉이 불가합니다.'
+            ].map(l => `<li>${l}</li>`).join('');
+        }
+        return [
+            '※ 감독관은 운영 계획 및 시험본부 지침에 따라 개봉 해주세요.',
+            '※ 개봉 후 작성된 부수 및 매수와 실제 수량이 일치한지 확인 해주세요'
+        ].map(l => `<li>${l}</li>`).join('');
+    }
+
+    function createLabelElement(d, totalCount, type) {
+        const footerHtml   = getFooterHtml(type);
+        const themeClass   = getHighlightClass(type);
+        const logoWidthEl  = $('logoWidth');
+        const logoHeightEl = $('logoHeight');
+        const logoWidth    = logoWidthEl ? (logoWidthEl.value || '600') : '600';
+        
+        // 1줄 고정 오토 리사이즈 래퍼
+        const wrap = (txt) => `
+            <div class="td-relative-container">
+                <div class="auto-resize-wrapper">
+                    <span class="auto-resize-text">${txt}</span>
+                </div>
+            </div>
+        `;
+
+        // 라벨 종류 문자열 지정
+        let typeStr = '';
+        if (type === 'question') typeStr = '문제지';
+        else if (type === 'answer') typeStr = '답안지';
+        else if (type === 'collect') typeStr = '회수봉투';
+
+        // 최상단 모던 타이틀 바
+        const titleBarHtml = `
+            <div class="label-title-bar ${themeClass}">
+                <div class="title-left">${d.period} ${d.subject}</div>
+                <div class="title-right">[ ${typeStr} ]</div>
+            </div>
+        `;
+
+        const div = document.createElement('div');
+        div.className = type === 'collect' ? 'label collect-label' : 'label';
+
+        // 비율 변경된 ColGroup 정의 (응시분야/대상인원 35%, 고사실/부수 25%)
+        const colGroupHtml = `<colgroup><col style="width:20%;"><col style="width:35%;"><col style="width:20%;"><col style="width:25%;"></colgroup>`;
+
+        // 회수 라벨 양식 (회수용은 상단 표를 크게 할 필요가 없어 row-sm 유지)
+        if (type === 'collect') {
+            const signMode = $('signMode') ? $('signMode').value : 'single';
+
+            div.innerHTML = `
+                ${titleBarHtml}
+                <table class="modern-table" style="table-layout:fixed; width:100%;">
+                    ${colGroupHtml}
+                    <tr class="row-sm"><th>기관</th><td class="center auto-resize-cell" colspan="3">${wrap(d.org || '')}</td></tr>
+                    <tr class="row-sm"><th>전형</th><td class="center auto-resize-cell" colspan="3">${wrap(d.examName || '')}</td></tr>
+                    <tr class="row-sm"><th>일시</th><td class="center auto-resize-cell" colspan="3">${wrap(d.date || '')}</td></tr>
+                    <tr class="row-sm">
+                        <th>${d.labelField}</th><td class="center auto-resize-cell">${wrap(d.field || '')}</td>
+                        <th>${d.labelRoom}</th><td class="center auto-resize-cell">${wrap(d.room || '')}</td>
+                    </tr>
+                </table>
+
+                <div class="signature-wrap">
+                    <table class="modern-table" style="width:100%; table-layout:fixed;">
+                        ${colGroupHtml}
+                        <tr style="height:8mm;">
+                            <th class="center">대상인원</th>
+                            <td class="center">${d.targetCount || ''}</td>
+                            <th class="center" colspan="2" style="background:#f8fafc;">감독관 확인</th>
+                        </tr>
+                        <tr style="height:11mm;">
+                            <th class="center">응시인원</th>
+                            <td class="center"></td>
+                            ${signMode === 'double' 
+                                ? `<td style="padding:4px 2px; vertical-align:middle; text-align:center;">정 감독관</td>
+                                   <td style="padding:4px 12px; vertical-align:bottom; text-align:right;">(인)</td>`
+                                : `<td rowspan="2" style="padding:4px 8px; vertical-align:middle; text-align:center;">정 감독관</td>
+                                   <td rowspan="2" style="padding:4px 12px; vertical-align:middle; text-align:right;">(인)</td>`
+                            }
+                        </tr>
+                        <tr style="height:11mm;">
+                            <th class="center">회수매수</th>
+                            <td class="center"></td>
+                            ${signMode === 'double' 
+                                ? `<td style="padding:4px 2px; vertical-align:middle; text-align:center;">부 감독관</td>
+                                   <td style="padding:4px 12px; vertical-align:bottom; text-align:right;">(인)</td>`
+                                : ''
+                            }
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="label-footer"><ul>${footerHtml}</ul></div>
+                <div class="label-logo">
+                    ${logoSrc ? `<img src="${logoSrc}" alt="기관 로고" style="width:${logoWidth}px;" onerror="this.style.display='none'; this.parentElement.querySelector('.logo-placeholder').style.display='block';">
+                    <div class="logo-placeholder" style="display:none; width:${logoWidth}px; height:65px;">CI</div>` : `<div class="logo-placeholder" style="width:${logoWidth}px; height:65px;">CI</div>`}
+                </div>
+            `;
+            return div;
+        }
+
+        // 문제지/답안지 공통 양식
+        div.innerHTML = `
+            ${titleBarHtml}
+            
+            <table class="modern-table" style="table-layout:fixed; width:100%;">
+                <colgroup><col style="width:20%;"><col style="width:80%;"></colgroup>
+                <!-- 높이를 늘린 특별한 클래스(row-md) 적용 -->
+                <tr class="row-md"><th>기관</th><td class="center auto-resize-cell">${wrap(d.org || '')}</td></tr>
+                <tr class="row-md"><th>전형</th><td class="center auto-resize-cell">${wrap(d.examName || '')}</td></tr>
+                <tr class="row-md"><th>일시</th><td class="center auto-resize-cell">${wrap(d.date || '')}</td></tr>
+            </table>
+
+            <table class="modern-table" style="table-layout:fixed; width:100%; margin-top:5mm;">
+                ${colGroupHtml}
+                <tr class="row-lg">
+                    <th>${d.labelField}</th><td class="center auto-resize-cell">${wrap(d.field || '')}</td>
+                    <th>${d.labelRoom}</th><td class="center auto-resize-cell">${wrap(d.room || '')}</td>
+                </tr>
+                <tr class="row-lg">
+                    <th>대상인원</th><td class="center auto-resize-cell">${wrap(d.targetCount || '')}</td>
+                    <th>부수</th><td class="center auto-resize-cell">${wrap(d.copies || '')}</td>
+                </tr>
+            </table>
+
+            <div class="label-footer"><ul>${footerHtml}</ul></div>
+            <div class="label-logo">
+                ${logoSrc ? `<img src="${logoSrc}" alt="기관 로고" style="width:${logoWidth}px;" onerror="this.style.display='none'; this.parentElement.querySelector('.logo-placeholder').style.display='block';">
+                <div class="logo-placeholder" style="display:none; width:${logoWidth}px; height:65px;">CI</div>` : `<div class="logo-placeholder" style="width:${logoWidth}px; height:65px;">CI</div>`}
+            </div>
+        `;
+        return div;
+    }
+
+    // 강력해진 오토 리사이즈 함수
+    function applyAutoResize(rootPane) {
+        if (!rootPane) return;
+        
+        rootPane.querySelectorAll('.auto-resize-cell').forEach(cell => {
+            const textEl = cell.querySelector('.auto-resize-text');
+            const wrapperEl = cell.querySelector('.auto-resize-wrapper');
+            if (!textEl || !wrapperEl) return;
+            
+            textEl.style.fontSize = '15pt';
+            let fontSize = 15;
+            
+            // 패딩(여백)을 고려한 실제 허용 너비/높이 측정
+            const availableWidth = wrapperEl.clientWidth - 8; 
+            const availableHeight = wrapperEl.clientHeight - 4;
+
+            if (availableWidth <= 0 || availableHeight <= 0) return;
+
+            // 텍스트가 정해진 박스 크기를 초과하면 0.5pt씩 강제 축소
+            while ((textEl.offsetWidth > availableWidth || textEl.offsetHeight > availableHeight) && fontSize > 5) {
+                fontSize -= 0.5;
+                textEl.style.fontSize = fontSize + 'pt';
+            }
+        });
+    }
+
+    function renderLabelsToPane(type, paneId) {
+        const baseData = getBaseDataFromForm();
+        const sections = getSectionsData();
+        const totalCount = baseData.length;
+        const pane = $(paneId);
+        pane.innerHTML = '';
+
+        const allLabelsToRender = [];
+
+        if (type === 'all') {
+            // [일괄출력] 빈칸 없이 모든 라벨을 일렬로 모아 라벨지 낭비 최소화
+            baseData.forEach(d => {
+                const labelTypes = ['question', 'answer', 'collect'];
+                labelTypes.forEach(labelType => {
+                    const copiesToUse = labelType === 'collect' ? '1' : (labelType === 'question' ? d.qCopies : d.aCopies);
+                    sections.forEach(sec => {
+                        allLabelsToRender.push({
+                            data: { ...d, period: sec.period, subject: sec.subject, copies: copiesToUse },
+                            type: labelType
+                        });
+                    });
+                });
+            });
+        } else {
+            // [개별 탭] 선택한 종류의 라벨만 일렬로 모아 출력
+            baseData.forEach(d => {
+                const copiesToUse = type === 'collect' ? '1' : (type === 'question' ? d.qCopies : d.aCopies);
+                sections.forEach(sec => {
+                    allLabelsToRender.push({
+                        data: { ...d, period: sec.period, subject: sec.subject, copies: copiesToUse },
+                        type: type
+                    });
+                });
+            });
+        }
+
+        // 수집된 모든 라벨을 순서대로 2개씩 묶어서 페이지에 꽉 차게 배치
+        for (let i = 0; i < allLabelsToRender.length; i += 2) {
+            const page = document.createElement('div');
+            page.className = 'print-page';
+            
+            const item1 = allLabelsToRender[i];
+            page.appendChild(createLabelElement(item1.data, totalCount, item1.type));
+            
+            if (allLabelsToRender[i + 1]) {
+                const item2 = allLabelsToRender[i + 1];
+                page.appendChild(createLabelElement(item2.data, totalCount, item2.type));
+            } else {
+                // 마지막에 하나만 남을 경우에만 빈 칸 추가 (인쇄 레이아웃 유지용)
+                const spacer = document.createElement('div');
+                spacer.className = 'label';
+                spacer.style.visibility = 'hidden';
+                page.appendChild(spacer);
+            }
+            pane.appendChild(page);
+        }
+    }
+
+    function updateLabel() {
+        renderLabelsToPane('all', 'pane-all');
+        renderLabelsToPane('question', 'pane-question');
+        renderLabelsToPane('answer', 'pane-answer');
+        renderLabelsToPane('collect', 'pane-collect');
+
+        const activeTab = document.querySelector('.tab[aria-selected="true"]');
+        if (activeTab) {
+            setActiveTab(activeTab.dataset.type);
+        }
+    }
+
+    function resetForm() {
+        location.reload();
+    }
+
+    // 로고 이벤트
+    const logoInput = $('logoInput');
+    const logoFileInput = $('logoFile');
+
+    logoInput.addEventListener('input', function () {
+        if (!logoFileInput.files || !logoFileInput.files[0]) {
+            logoSrc = this.value.trim() ? this.value.trim() : '';
+            updateLabel();
+        }
+    });
+
+    logoFileInput.addEventListener('change', function () {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = e => { logoSrc = e.target.result; updateLabel(); };
+            reader.onerror = () => { alert('이미지 읽기 오류'); logoSrc = ''; updateLabel(); };
+            reader.readAsDataURL(file);
+        } else {
+            logoSrc = logoInput.value.trim() ? logoInput.value.trim() : '';
+            updateLabel();
+        }
+    });
+
+    // 모든 정적 필드 이벤트 바인딩
+    document.querySelectorAll('input, textarea, select').forEach(el => {
+        if (el.id === 'logoInput' || el.id === 'logoFile') return;
+        el.addEventListener('input', updateLabel);
+        el.addEventListener('change', updateLabel);
+    });
+
+    // 탭 동작
+    function setActiveTab(type) {
+        document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.type === type)));
+
+        $('pane-all').hidden = type !== 'all';
+        $('pane-question').hidden = type !== 'question';
+        $('pane-answer').hidden = type !== 'answer';
+        $('pane-collect').hidden = type !== 'collect';
+
+        setTimeout(() => { applyAutoResize($(`pane-${type}`)); }, 30);
+    }
+
+    document.querySelectorAll('.tab').forEach(btn => {
+        btn.addEventListener('click', () => setActiveTab(btn.dataset.type));
+    });
+
+    // 데이터 저장 (JSON 파일로 다운로드)
+    function saveConfig() {
+        const config = {
+            common: {
+                labelField: $('labelField').value,
+                labelRoom: $('labelRoom').value,
+                org: $('org').value,
+                examName: $('examName').value,
+                date: $('date').value,
+                logoInput: $('logoInput').value,
+                logoWidth: $('logoWidth').value,
+                signMode: $('signMode').value
+            },
+            sections: getSectionsData(),
+            rooms: []
+        };
+        
+        document.querySelectorAll('.room-block').forEach(block => {
+            config.rooms.push({
+                field: block.querySelector('.room-field').value,
+                name: block.querySelector('.room-name').value,
+                target: block.querySelector('.room-target').value,
+                qCopies: block.querySelector('.room-qcopies').value,
+                aCopies: block.querySelector('.room-acopies').value
+            });
+        });
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(config));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "label_config.json"); // 설정 파일명
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    // 데이터 불러오기 (JSON 파일 파싱)
+    function loadConfig(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const config = JSON.parse(e.target.result);
+                
+                // 1. 공통 정보 적용
+                if (config.common) {
+                    if(config.common.labelField !== undefined) $('labelField').value = config.common.labelField;
+                    if(config.common.labelRoom !== undefined) $('labelRoom').value = config.common.labelRoom;
+                    $('org').value = config.common.org || '';
+                    $('examName').value = config.common.examName || '';
+                    $('date').value = config.common.date || '';
+                    $('logoInput').value = config.common.logoInput || '';
+                    if(config.common.logoWidth) $('logoWidth').value = config.common.logoWidth;
+                    $('signMode').value = config.common.signMode || 'single';
+                    
+                    logoSrc = $('logoInput').value.trim() ? $('logoInput').value.trim() : '';
+                }
+
+                // 2. 섹션(교시/과목) 목록 적용
+                $('sectionList').innerHTML = ''; // 기존 목록 초기화
+                if (config.sections && Array.isArray(config.sections)) {
+                    config.sections.forEach(sec => addSection(sec));
+                } else if (config.common && (config.common.period1 || config.common.subject1)) {
+                    // 구버전 파일 호환성 처리
+                    addSection({ period: config.common.period1, subject: config.common.subject1 });
+                    if (config.common.period2 || config.common.subject2) {
+                        addSection({ period: config.common.period2, subject: config.common.subject2 });
+                    }
+                } else {
+                    addSection({ period: '1교시', subject: '인성검사' });
+                }
+                
+                // 3. 고사실 목록 적용
+                if (config.rooms && Array.isArray(config.rooms)) {
+                    $('roomList').innerHTML = ''; // 기존 목록 초기화
+                    config.rooms.forEach(room => {
+                        // 구버전 파일(공통 영역에 응시분야가 있었던 버전) 호환성 처리
+                        if (room.field === undefined && config.common && config.common.field !== undefined) {
+                            room.field = config.common.field;
+                        }
+                        addRoom(room);
+                    });
+                }
+                
+                updateLabel();
+                alert('설정 데이터가 성공적으로 적용되었습니다.');
+            } catch(err) {
+                alert('잘못된 파일이거나 데이터를 읽을 수 없습니다.');
+            }
+        };
+        reader.readAsText(file);
+        
+        // 재사용을 위해 input 초기화
+        event.target.value = '';
+    }
+
+    // 초기 실행
+    addSection({ period: '1교시', subject: '인성검사' });
+    addSection({ period: '2교시', subject: '직무능력검사' });
+    addRoom({ name: '1고사실', target: '', qCopies: '', aCopies: '', field: '' });
+    updateLabel();
+    setActiveTab('all');
+</script>
+</body>
+</html>
