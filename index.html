@@ -54,19 +54,20 @@
         /* ==== 탭 ==== */
         .tabs {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             margin: 6px 0 10px;
         }
 
         .tab {
             flex: 1;
-            padding: 8px 4px;
+            padding: 8px 2px;
             border: 2px solid;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             text-align: center;
+            white-space: nowrap;
             user-select: none;
             transition: all 0.2s;
         }
@@ -92,12 +93,18 @@
             color: #0060c0;
             border-color: #0060c0;
         }
+        .tab[data-type="collect_q"] {
+            background: #f0fdfa;
+            color: #0f766e;
+            border-color: #0f766e;
+        }
 
         /* 활성화된 탭 */
         .tab[aria-selected="true"][data-type="all"] { background: #6a1b9a; color: #fff; }
         .tab[aria-selected="true"][data-type="question"] { background: #c00000; color: #fff; }
         .tab[aria-selected="true"][data-type="answer"] { background: #b8860b; color: #fff; }
         .tab[aria-selected="true"][data-type="collect"] { background: #0060c0; color: #fff; }
+        .tab[aria-selected="true"][data-type="collect_q"] { background: #0f766e; color: #fff; }
 
         .field-group {
             margin-bottom: 8px;
@@ -254,6 +261,7 @@
         .theme-question { background: #fef2f2; border-color: #ef4444; color: #b91c1c; }
         .theme-answer { background: #fffbeb; border-color: #f59e0b; color: #b45309; }
         .theme-collect { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+        .theme-collect-q { background: #f0fdfa; border-color: #14b8a6; color: #0f766e; }
 
         .title-left { font-size: 1.15em; font-weight: 700; }
         .title-right { font-size: 1.35em; font-weight: 900; letter-spacing: 2px; }
@@ -393,10 +401,11 @@
                 <button type="button" class="tab" role="tab" data-type="all" aria-selected="true">일괄출력</button>
                 <button type="button" class="tab" role="tab" data-type="question" aria-selected="false">문제지</button>
                 <button type="button" class="tab" role="tab" data-type="answer" aria-selected="false">답안지</button>
-                <button type="button" class="tab" role="tab" data-type="collect" aria-selected="false">회수</button>
+                <button type="button" class="tab" role="tab" data-type="collect" aria-selected="false">답안지 회수</button>
+                <button type="button" class="tab" role="tab" data-type="collect_q" aria-selected="false">문제지 회수</button>
             </div>
             <div class="help-text">
-                <b>[일괄출력]</b> 선택 시: 고사실 마다 총 3장(문제지 1장, 답안지 1장, 회수 1장)이 최적화되어 세트로 출력됩니다.
+                <b>[일괄출력]</b> 선택 시: 고사실 마다 총 4종(문제지, 답안지, 답안지 회수, 문제지 회수)이 빈칸 없이 최적화되어 출력됩니다.
             </div>
         </div>
 
@@ -462,7 +471,7 @@
             </div>
         </div>
         <div class="field-group">
-            <label for="signMode">감독관 확인 서명란(회수 탭)</label>
+            <label for="signMode">감독관 확인 서명란(답안지 회수 탭)</label>
             <select id="signMode">
                 <option value="single">정감독관 1명 서명</option>
                 <option value="double">정/부 감독관 2명 서명</option>
@@ -504,6 +513,7 @@
             <div id="pane-question" class="labels-pane" role="tabpanel" aria-labelledby="tab-question" hidden></div>
             <div id="pane-answer" class="labels-pane" role="tabpanel" aria-labelledby="tab-answer" hidden></div>
             <div id="pane-collect" class="labels-pane" role="tabpanel" aria-labelledby="tab-collect" hidden></div>
+            <div id="pane-collect_q" class="labels-pane" role="tabpanel" aria-labelledby="tab-collect_q" hidden></div>
         </div>
     </div>
 </div>
@@ -757,6 +767,7 @@
         if (type === 'question') return 'theme-question';
         if (type === 'answer') return 'theme-answer';
         if (type === 'collect') return 'theme-collect';
+        if (type === 'collect_q') return 'theme-collect-q';
         return 'theme-question';
     }
 
@@ -766,6 +777,13 @@
                 '※ 응시인원과 회수된 답안지 매수가 일치하는지 확인하여 주십시오.',
                 '※ 본 회수용 봉투에는 유효 답안지(최종 제출 답안지)만 넣어 주십시오.',
                 '※ 본 봉투는 관계자 외에는 개봉이 불가합니다.'
+            ].map(l => `<li>${l}</li>`).join('');
+        }
+        if (type === 'collect_q') {
+            return [
+                '※ 시험 종료 후 풀이가 완료된 문제지(검사지) 전량을 본 봉투에 회수하여 주십시오.',
+                '※ 배부된 문제지 부수와 회수된 부수(미응시자 잔여분 포함)가 일치하는지 확인하여 주십시오.',
+                '※ 유출 방지 및 보안 유지를 위해 본 봉투는 관계자 외 개봉이 불가합니다.'
             ].map(l => `<li>${l}</li>`).join('');
         }
         return [
@@ -794,7 +812,8 @@
         let typeStr = '';
         if (type === 'question') typeStr = '문제지';
         else if (type === 'answer') typeStr = '답안지';
-        else if (type === 'collect') typeStr = '회수봉투';
+        else if (type === 'collect') typeStr = '답안지 회수';
+        else if (type === 'collect_q') typeStr = '문제지 회수';
 
         // 최상단 모던 타이틀 바
         const titleBarHtml = `
@@ -805,12 +824,12 @@
         `;
 
         const div = document.createElement('div');
-        div.className = type === 'collect' ? 'label collect-label' : 'label';
+        div.className = (type === 'collect' || type === 'collect_q') ? 'label collect-label' : 'label';
 
         // 비율 변경된 ColGroup 정의 (응시분야/대상인원 35%, 고사실/부수 25%)
         const colGroupHtml = `<colgroup><col style="width:20%;"><col style="width:35%;"><col style="width:20%;"><col style="width:25%;"></colgroup>`;
 
-        // 회수 라벨 양식 (회수용은 상단 표를 크게 할 필요가 없어 row-sm 유지)
+        // 답안지 회수 라벨 양식
         if (type === 'collect') {
             const signMode = $('signMode') ? $('signMode').value : 'single';
 
@@ -853,6 +872,46 @@
                                    <td style="padding:4px 12px; vertical-align:bottom; text-align:right;">(인)</td>`
                                 : ''
                             }
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="label-footer"><ul>${footerHtml}</ul></div>
+                <div class="label-logo">
+                    ${logoSrc ? `<img src="${logoSrc}" alt="기관 로고" style="width:${logoWidth}px;" onerror="this.style.display='none'; this.parentElement.querySelector('.logo-placeholder').style.display='block';">
+                    <div class="logo-placeholder" style="display:none; width:${logoWidth}px; height:65px;">CI</div>` : `<div class="logo-placeholder" style="width:${logoWidth}px; height:65px;">CI</div>`}
+                </div>
+            `;
+            return div;
+        }
+
+        // 문제지 회수 라벨 양식 (서명란 제외, 수량 확인 전용)
+        if (type === 'collect_q') {
+            div.innerHTML = `
+                ${titleBarHtml}
+                <table class="modern-table" style="table-layout:fixed; width:100%;">
+                    ${colGroupHtml}
+                    <tr class="row-sm"><th>기관</th><td class="center auto-resize-cell" colspan="3">${wrap(d.org || '')}</td></tr>
+                    <tr class="row-sm"><th>전형</th><td class="center auto-resize-cell" colspan="3">${wrap(d.examName || '')}</td></tr>
+                    <tr class="row-sm"><th>일시</th><td class="center auto-resize-cell" colspan="3">${wrap(d.date || '')}</td></tr>
+                    <tr class="row-sm">
+                        <th>${d.labelField}</th><td class="center auto-resize-cell">${wrap(d.field || '')}</td>
+                        <th>${d.labelRoom}</th><td class="center auto-resize-cell">${wrap(d.room || '')}</td>
+                    </tr>
+                </table>
+
+                <div class="signature-wrap">
+                    <table class="modern-table" style="width:100%; table-layout:fixed;">
+                        ${colGroupHtml}
+                        <tr style="height:11mm;">
+                            <th class="center">대상인원</th>
+                            <td class="center">${d.targetCount || ''}</td>
+                            <th class="center" rowspan="2">회수부수</th>
+                            <td class="center" rowspan="2"></td>
+                        </tr>
+                        <tr style="height:11mm;">
+                            <th class="center">응시인원</th>
+                            <td class="center"></td>
                         </tr>
                     </table>
                 </div>
@@ -937,9 +996,9 @@
         if (type === 'all') {
             // [일괄출력] 빈칸 없이 모든 라벨을 일렬로 모아 라벨지 낭비 최소화
             baseData.forEach(d => {
-                const labelTypes = ['question', 'answer', 'collect'];
+                const labelTypes = ['question', 'answer', 'collect', 'collect_q'];
                 labelTypes.forEach(labelType => {
-                    const copiesToUse = labelType === 'collect' ? '1' : (labelType === 'question' ? d.qCopies : d.aCopies);
+                    const copiesToUse = labelType === 'collect' ? '1' : ((labelType === 'question' || labelType === 'collect_q') ? d.qCopies : d.aCopies);
                     sections.forEach(sec => {
                         allLabelsToRender.push({
                             data: { ...d, period: sec.period, subject: sec.subject, copies: copiesToUse },
@@ -951,7 +1010,7 @@
         } else {
             // [개별 탭] 선택한 종류의 라벨만 일렬로 모아 출력
             baseData.forEach(d => {
-                const copiesToUse = type === 'collect' ? '1' : (type === 'question' ? d.qCopies : d.aCopies);
+                const copiesToUse = type === 'collect' ? '1' : ((type === 'question' || type === 'collect_q') ? d.qCopies : d.aCopies);
                 sections.forEach(sec => {
                     allLabelsToRender.push({
                         data: { ...d, period: sec.period, subject: sec.subject, copies: copiesToUse },
@@ -988,6 +1047,7 @@
         renderLabelsToPane('question', 'pane-question');
         renderLabelsToPane('answer', 'pane-answer');
         renderLabelsToPane('collect', 'pane-collect');
+        renderLabelsToPane('collect_q', 'pane-collect_q');
 
         const activeTab = document.querySelector('.tab[aria-selected="true"]');
         if (activeTab) {
@@ -1038,6 +1098,7 @@
         $('pane-question').hidden = type !== 'question';
         $('pane-answer').hidden = type !== 'answer';
         $('pane-collect').hidden = type !== 'collect';
+        $('pane-collect_q').hidden = type !== 'collect_q';
 
         setTimeout(() => { applyAutoResize($(`pane-${type}`)); }, 30);
     }
